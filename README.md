@@ -93,7 +93,7 @@ Incorrect inclusion of extremely faint groups of small background point-like obj
 
 With regard to this last issue, many instances were detected where the additional information seemed to have actually helped “turn off” those faint background point-like objects in optical +IR+UV while being shown (incorrectly) if using only optical as source image.
 
-Further experimentation with more complex images and additional wavelengths is needed but, judging by the results, the model seems to be using the additional information successfully to constrain and better render the target image. Specially interesting is the fact that color is better translated when using information from additional wavelengths, this is in line with Plank’s black-body radiation, visual appearance and radiation spectral density (and temperature) are interrelated.
+Further experimentation with more complex images and additional wavelengths is needed but, judging by the results, the model seems to be using the additional information successfully to constrain and better render the target image. Specially interesting is the fact that color is better translated when using information from additional wavelengths, this is in line with Plank’s black-body radiation: visual appearance and radiation spectral density (and temperature) are interrelated.
 
 ## Acknowledgments 
 @inproceedings{CycleGAN2017,
