@@ -1,218 +1,101 @@
+# Space image-to-image translation with Pix2Pix and Aladin Sky Atlas
 
-<img src='imgs/horse2zebra.gif' align="right" width=384>
+This project uses the conditional GAN Pix2Pix in combination with the Aladin Sky Atlas software to generate images of a portion of the sky in a desired wavelength from images of the same portion of the sky in other wavelengths. 
+The code of the original Pix2Pix to input a dataset has been slightly modified in order to accept several input images, thus allowing the model to go not only from B to A but from B + C + D… to A. 
+To use this project just follow the instructions in the original [Pix2Pix repository](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix9) but using the modified code and multiinput dataset here.
 
-<br><br><br>
+## Motivation and theoretical rationale
+Different sky surveys have yielded data about portions of the sky in different wavelengths, with different resolutions and with a different total coverage. Very few of them are all-sky surveys, most of the data available has either very limited coverage (HST) or low resolution (2MASS). This results in parts of the sky where there might be data available in different resolutions and wavelengths but not in others. This project intends to find out if it is possible and feasible to use that available and complementary information to generate a target image in the unavailable wavelength/resolution.
 
-# CycleGAN and pix2pix in PyTorch
-
-**New**:  Please check out [contrastive-unpaired-translation](https://github.com/taesungp/contrastive-unpaired-translation) (CUT), our new unpaired image-to-image translation model that enables fast and memory-efficient training.
-
-We provide PyTorch implementations for both unpaired and paired image-to-image translation.
-
-The code was written by [Jun-Yan Zhu](https://github.com/junyanz) and [Taesung Park](https://github.com/taesungp), and supported by [Tongzhou Wang](https://github.com/SsnL).
-
-This PyTorch implementation produces results comparable to or better than our original Torch software. If you would like to reproduce the same results as in the papers, check out the original [CycleGAN Torch](https://github.com/junyanz/CycleGAN) and [pix2pix Torch](https://github.com/phillipi/pix2pix) code in Lua/Torch.
-
-**Note**: The current software works well with PyTorch 1.4. Check out the older [branch](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/tree/pytorch0.3.1) that supports PyTorch 0.1-0.3.
-
-You may find useful information in [training/test tips](docs/tips.md) and [frequently asked questions](docs/qa.md). To implement custom models and datasets, check out our [templates](#custom-model-and-dataset). To help users better understand and adapt our codebase, we provide an [overview](docs/overview.md) of the code structure of this repository.
-
-**CycleGAN: [Project](https://junyanz.github.io/CycleGAN/) |  [Paper](https://arxiv.org/pdf/1703.10593.pdf) |  [Torch](https://github.com/junyanz/CycleGAN) |
-[Tensorflow Core Tutorial](https://www.tensorflow.org/tutorials/generative/cyclegan) | [PyTorch Colab](https://colab.research.google.com/github/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/CycleGAN.ipynb)**
-
-<img src="https://junyanz.github.io/CycleGAN/images/teaser_high_res.jpg" width="800"/>
-
-**Pix2pix:  [Project](https://phillipi.github.io/pix2pix/) |  [Paper](https://arxiv.org/pdf/1611.07004.pdf) |  [Torch](https://github.com/phillipi/pix2pix) |
-[Tensorflow Core Tutorial](https://www.tensorflow.org/tutorials/generative/pix2pix) | [PyTorch Colab](https://colab.research.google.com/github/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/pix2pix.ipynb)**
-
-<img src="https://phillipi.github.io/pix2pix/images/teaser_v3.png" width="800px"/>
+From a theoretical point of view, the physical law most relevant to our use case is Planck’s law. This law describes the spectral density of electromagnetic radiation emitted by a black body in thermal equilibrium at a given temperature T. A black-body is an idealized object which absorbs and emits all radiation frequencies. Planck radiation has a maximum intensity at a wavelength that depends on the temperature of the body ([Wikipedia](https://en.wikipedia.org/wiki/Planck%27s_law)).
 
 
-**[EdgesCats Demo](https://affinelayer.com/pixsrv/) | [pix2pix-tensorflow](https://github.com/affinelayer/pix2pix-tensorflow) | by [Christopher Hesse](https://twitter.com/christophrhesse)**
+  <img align="center" src="https://user-images.githubusercontent.com/108660081/182445316-5c914dd2-76a6-4630-b442-be5027ea1635.png" width="400"/>  
+  <img align="center" src="https://user-images.githubusercontent.com/108660081/182445881-8093107d-358f-4b29-8723-749766a62127.png" width="400"/>
+                  <sub>Family of curves for different temperatures (left) and the Sun approximated as a black-body (right)</sub>
 
-<img src='imgs/edges2cats.jpg' width="400px"/>
+In other words, Planck’s law shows that it may be possible to use complementary wavelengths (astronomical observations) to reconstruct a missing one.
 
-If you use this code for your research, please cite:
+## Dataset creation
+Each data point or element in the dataset should look like this:
 
-Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks.<br>
-[Jun-Yan Zhu](https://www.cs.cmu.edu/~junyanz/)\*,  [Taesung Park](https://taesung.me/)\*, [Phillip Isola](https://people.eecs.berkeley.edu/~isola/), [Alexei A. Efros](https://people.eecs.berkeley.edu/~efros). In ICCV 2017. (* equal contributions) [[Bibtex]](https://junyanz.github.io/CycleGAN/CycleGAN.txt)
+![imagen](https://user-images.githubusercontent.com/108660081/182447267-f2db0b77-10cc-44e3-ae1e-a7490eb39d4a.png)
 
+A single image made up of several (4 in this case) horizontally concatenated images of the same object from different observations/wavelengths (SDSS9 (high-res optical), GALEX (UV), 2MASS (IR) and DSS2 (low-res optical), respectively in the previous example).
 
-Image-to-Image Translation with Conditional Adversarial Networks.<br>
-[Phillip Isola](https://people.eecs.berkeley.edu/~isola), [Jun-Yan Zhu](https://www.cs.cmu.edu/~junyanz/), [Tinghui Zhou](https://people.eecs.berkeley.edu/~tinghuiz), [Alexei A. Efros](https://people.eecs.berkeley.edu/~efros). In CVPR 2017. [[Bibtex]](https://www.cs.cmu.edu/~junyanz/projects/pix2pix/pix2pix.bib)
+To create a dataset for training and/or a data point for inference the desired images have to be extracted from Aladin, a sky atlas software. The script aladin_data.py contains a basic example to automatically extract the 7840 astronomical objects in the New General Catalogue (NGC) in four different wavelengths from Aladin and concatenate them into a dataset. It is possible to get any other object or portion of the sky by modifying the script. The name of astronomical objects as well as specific coordinates can be used as input to extract images from Aladin.
 
-## Talks and Course
-pix2pix slides: [keynote](http://efrosgans.eecs.berkeley.edu/CVPR18_slides/pix2pix.key) | [pdf](http://efrosgans.eecs.berkeley.edu/CVPR18_slides/pix2pix.pdf),
-CycleGAN slides: [pptx](http://efrosgans.eecs.berkeley.edu/CVPR18_slides/CycleGAN.pptx) | [pdf](http://efrosgans.eecs.berkeley.edu/CVPR18_slides/CycleGAN.pdf)
+## Pix2Pix code modification
+For the model to correctly accept data points like the example above and process them into several input images and one output image, the last part of the code aligned_dataset.py was modified as follows. This code assumes that 4 images of 3 channels each are fed, crops them, transforms them and concatenates the inputs as tensors (3 inputs and 1 output, B+C+D =>A) (in principle it should be possible to allow an arbitrary number of input images with a more efficient modification):
 
-CycleGAN course assignment [code](http://www.cs.toronto.edu/~rgrosse/courses/csc321_2018/assignments/a4-code.zip) and [handout](http://www.cs.toronto.edu/~rgrosse/courses/csc321_2018/assignments/a4-handout.pdf) designed by Prof. [Roger Grosse](http://www.cs.toronto.edu/~rgrosse/) for [CSC321](http://www.cs.toronto.edu/~rgrosse/courses/csc321_2018/) "Intro to Neural Networks and Machine Learning" at University of Toronto. Please contact the instructor if you would like to adopt it in your course.
+```
+[...]
+import torch
+[...]
+        # split AB image into A and B (concatenated B+C+D)
+        w, h = AB.size
+        w4 = int(w / 4)
+        A = AB.crop((0, 0, w4, h))
+        B = AB.crop((w4, 0, w4*2, h))
+        C = AB.crop((w4*2, 0, w4*3, h))
+        D = AB.crop((w4*3, 0, w, h))
 
-## Colab Notebook
-TensorFlow Core CycleGAN Tutorial: [Google Colab](https://colab.research.google.com/github/tensorflow/docs/blob/master/site/en/tutorials/generative/cyclegan.ipynb) | [Code](https://github.com/tensorflow/docs/blob/master/site/en/tutorials/generative/cyclegan.ipynb)
+        # apply the same transform to both A and B
+        transform_params = get_params(self.opt, A.size)
+        A_transform = get_transform(self.opt, transform_params, grayscale=(self.input_nc == 1))
+        B_transform = get_transform(self.opt, transform_params, grayscale=(self.output_nc == 1))
 
-TensorFlow Core pix2pix Tutorial: [Google Colab](https://colab.research.google.com/github/tensorflow/docs/blob/master/site/en/tutorials/generative/pix2pix.ipynb) | [Code](https://github.com/tensorflow/docs/blob/master/site/en/tutorials/generative/pix2pix.ipynb)
+        A = A_transform(A)
+        B = B_transform(B)
+        C = B_transform(C)
+        D = B_transform(D)
+        B = torch.cat((B, C, D))
 
-PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/CycleGAN.ipynb) and [pix2pix](https://colab.research.google.com/github/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/pix2pix.ipynb)
+        return {'A': A, 'B': B, 'A_paths': AB_path, 'B_paths': AB_path}
 
-ZeroCostDL4Mic Colab notebook: [CycleGAN](https://colab.research.google.com/github/HenriquesLab/ZeroCostDL4Mic/blob/master/Colab_notebooks_Beta/CycleGAN_ZeroCostDL4Mic.ipynb) and [pix2pix](https://colab.research.google.com/github/HenriquesLab/ZeroCostDL4Mic/blob/master/Colab_notebooks_Beta/pix2pix_ZeroCostDL4Mic.ipynb)
-
-## Other implementations
-### CycleGAN
-<p><a href="https://github.com/leehomyc/cyclegan-1"> [Tensorflow]</a> (by Harry Yang),
-<a href="https://github.com/architrathore/CycleGAN/">[Tensorflow]</a> (by Archit Rathore),
-<a href="https://github.com/vanhuyz/CycleGAN-TensorFlow">[Tensorflow]</a> (by Van Huy),
-<a href="https://github.com/XHUJOY/CycleGAN-tensorflow">[Tensorflow]</a> (by Xiaowei Hu),
-<a href="https://github.com/LynnHo/CycleGAN-Tensorflow-2"> [Tensorflow2]</a> (by Zhenliang He),
-<a href="https://github.com/luoxier/CycleGAN_Tensorlayer"> [TensorLayer1.0]</a> (by luoxier),
-<a href="https://github.com/tensorlayer/cyclegan"> [TensorLayer2.0]</a> (by zsdonghao),
-<a href="https://github.com/Aixile/chainer-cyclegan">[Chainer]</a> (by Yanghua Jin),
-<a href="https://github.com/yunjey/mnist-svhn-transfer">[Minimal PyTorch]</a> (by yunjey),
-<a href="https://github.com/Ldpe2G/DeepLearningForFun/tree/master/Mxnet-Scala/CycleGAN">[Mxnet]</a> (by Ldpe2G),
-<a href="https://github.com/tjwei/GANotebooks">[lasagne/Keras]</a> (by tjwei),
-<a href="https://github.com/simontomaskarlsson/CycleGAN-Keras">[Keras]</a> (by Simon Karlsson),
-<a href="https://github.com/Ldpe2G/DeepLearningForFun/tree/master/Oneflow-Python/CycleGAN">[OneFlow]</a> (by Ldpe2G)
-</p>
-</ul>
-
-### pix2pix
-<p><a href="https://github.com/affinelayer/pix2pix-tensorflow"> [Tensorflow]</a> (by Christopher Hesse),
-<a href="https://github.com/Eyyub/tensorflow-pix2pix">[Tensorflow]</a> (by Eyyüb Sariu),
-<a href="https://github.com/datitran/face2face-demo"> [Tensorflow (face2face)]</a> (by Dat Tran),
-<a href="https://github.com/awjuliani/Pix2Pix-Film"> [Tensorflow (film)]</a> (by Arthur Juliani),
-<a href="https://github.com/kaonashi-tyc/zi2zi">[Tensorflow (zi2zi)]</a> (by Yuchen Tian),
-<a href="https://github.com/pfnet-research/chainer-pix2pix">[Chainer]</a> (by mattya),
-<a href="https://github.com/tjwei/GANotebooks">[tf/torch/keras/lasagne]</a> (by tjwei),
-<a href="https://github.com/taey16/pix2pixBEGAN.pytorch">[Pytorch]</a> (by taey16)
-</p>
-</ul>
-
-## Prerequisites
-- Linux or macOS
-- Python 3
-- CPU or NVIDIA GPU + CUDA CuDNN
-
-## Getting Started
-### Installation
-
-- Clone this repo:
-```bash
-git clone https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix
-cd pytorch-CycleGAN-and-pix2pix
 ```
 
-- Install [PyTorch](http://pytorch.org) and 0.4+ and other dependencies (e.g., torchvision, [visdom](https://github.com/facebookresearch/visdom) and [dominate](https://github.com/Knio/dominate)).
-  - For pip users, please type the command `pip install -r requirements.txt`.
-  - For Conda users, you can create a new Conda environment using `conda env create -f environment.yml`.
-  - For Docker users, we provide the pre-built Docker image and Dockerfile. Please refer to our [Docker](docs/docker.md) page.
-  - For Repl users, please click [![Run on Repl.it](https://repl.it/badge/github/junyanz/pytorch-CycleGAN-and-pix2pix)](https://repl.it/github/junyanz/pytorch-CycleGAN-and-pix2pix).
+Additionally, the current original Pix2Pix code does not support visualization of images with a number of channels different from 1 or 3. To avoid an error, the function called tensor2im in util.py has to be modified by adding the following:
 
-### CycleGAN train/test
-- Download a CycleGAN dataset (e.g. maps):
-```bash
-bash ./datasets/download_cyclegan_dataset.sh maps
 ```
-- To view training results and loss plots, run `python -m visdom.server` and click the URL http://localhost:8097.
-- To log training progress and test images to W&B dashboard, set the `--use_wandb` flag with train and test script
-- Train a model:
-```bash
-#!./scripts/train_cyclegan.sh
-python train.py --dataroot ./datasets/maps --name maps_cyclegan --model cycle_gan
-```
-To see more intermediate results, check out `./checkpoints/maps_cyclegan/web/index.html`.
-- Test the model:
-```bash
-#!./scripts/test_cyclegan.sh
-python test.py --dataroot ./datasets/maps --name maps_cyclegan --model cycle_gan
-```
-- The test results will be saved to a html file here: `./results/maps_cyclegan/latest_test/index.html`.
-
-### pix2pix train/test
-- Download a pix2pix dataset (e.g.[facades](http://cmp.felk.cvut.cz/~tylecr1/facade/)):
-```bash
-bash ./datasets/download_pix2pix_dataset.sh facades
-```
-- To view training results and loss plots, run `python -m visdom.server` and click the URL http://localhost:8097.
-- To log training progress and test images to W&B dashboard, set the `--use_wandb` flag with train and test script
-- Train a model:
-```bash
-#!./scripts/train_pix2pix.sh
-python train.py --dataroot ./datasets/facades --name facades_pix2pix --model pix2pix --direction BtoA
-```
-To see more intermediate results, check out  `./checkpoints/facades_pix2pix/web/index.html`.
-
-- Test the model (`bash ./scripts/test_pix2pix.sh`):
-```bash
-#!./scripts/test_pix2pix.sh
-python test.py --dataroot ./datasets/facades --name facades_pix2pix --model pix2pix --direction BtoA
-```
-- The test results will be saved to a html file here: `./results/facades_pix2pix/test_latest/index.html`. You can find more scripts at `scripts` directory.
-- To train and test pix2pix-based colorization models, please add `--model colorization` and `--dataset_mode colorization`. See our training [tips](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/docs/tips.md#notes-on-colorization) for more details.
-
-### Apply a pre-trained model (CycleGAN)
-- You can download a pretrained model (e.g. horse2zebra) with the following script:
-```bash
-bash ./scripts/download_cyclegan_model.sh horse2zebra
-```
-- The pretrained model is saved at `./checkpoints/{name}_pretrained/latest_net_G.pth`. Check [here](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/scripts/download_cyclegan_model.sh#L3) for all the available CycleGAN models.
-- To test the model, you also need to download the  horse2zebra dataset:
-```bash
-bash ./datasets/download_cyclegan_dataset.sh horse2zebra
+[...]
+        if image_numpy.shape[0] == 1:  # grayscale to RGB
+            image_numpy = np.tile(image_numpy, (3, 1, 1))
+        if image_numpy.shape[0] == 9:  
+            image_numpy, b, c = np.vsplit(image_numpy, 3)
+[...]
 ```
 
-- Then generate the results using
-```bash
-python test.py --dataroot datasets/horse2zebra/testA --name horse2zebra_pretrained --model test --no_dropout
-```
-- The option `--model test` is used for generating results of CycleGAN only for one side. This option will automatically set `--dataset_mode single`, which only loads the images from one set. On the contrary, using `--model cycle_gan` requires loading and generating results in both directions, which is sometimes unnecessary. The results will be saved at `./results/`. Use `--results_dir {directory_path_to_save_result}` to specify the results directory.
+This will just resplit the input images that were concatenated to feed the network and return one of them for visualization as real B (origin) for reference.
 
-- For pix2pix and your own models, you need to explicitly specify `--netG`, `--norm`, `--no_dropout` to match the generator architecture of the trained model. See this [FAQ](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/docs/qa.md#runtimeerror-errors-in-loading-state_dict-812-671461-296) for more details.
+## Some results and comments
+A Pix2Pix model was trained on a dataset of 3019 images of objects of the NGC to go from low quality optical (DSS2) to better quality optical (SDSS9), using (i) only low quality optical, (ii) low quality optical + IR and (iii) low quality optical + IR + UV. The training was stopped at around 90 epochs given a non-improving divergence in the adversarial loss and the model at epoch 65 (before divergence started) used for testing. The results were compared in the W&B platform using the generator loss as metric and by visual inspection.
 
-### Apply a pre-trained model (pix2pix)
-Download a pre-trained model with `./scripts/download_pix2pix_model.sh`.
+The loss function of the generator in Pix2Pix is made up of two terms: the adversarial loss and the L1 loss:
 
-- Check [here](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/scripts/download_pix2pix_model.sh#L3) for all the available pix2pix models. For example, if you would like to download label2photo model on the Facades dataset,
-```bash
-bash ./scripts/download_pix2pix_model.sh facades_label2photo
-```
-- Download the pix2pix facades datasets:
-```bash
-bash ./datasets/download_pix2pix_dataset.sh facades
-```
-- Then generate the results using
-```bash
-python test.py --dataroot ./datasets/facades/ --direction BtoA --model pix2pix --name facades_label2photo_pretrained
-```
-- Note that we specified `--direction BtoA` as Facades dataset's A to B direction is photos to labels.
+![imagen](https://user-images.githubusercontent.com/108660081/182449312-2547c60c-4e81-4dc8-8e80-8a17a527c702.png)
 
-- If you would like to apply a pre-trained model to a collection of input images (rather than image pairs), please use `--model test` option. See `./scripts/test_single.sh` for how to apply a model to Facade label maps (stored in the directory `facades/testB`).
+According to Jason Brownlee from [Machine Learning Mastery](https://machinelearningmastery.com/a-gentle-introduction-to-pix2pix-generative-adversarial-network/) “*The adversarial loss influences whether the generator model can output images that are plausible in the target domain, whereas the L1 loss regularizes the generator model to output images that are a plausible translation of the source image*”. 
 
-- See a list of currently available models at `./scripts/download_pix2pix_model.sh`
+The parameter importance tool from W&B shows that there is a relevant negative correlation between the adversarial loss and the parameter input_nc (number of input channels, i.e., number of input images), that is, the higher the number of input images the lower the loss, as expected. Regarding the L1 loss, the correlation varied during training between positive and negative while comparing only the three abovementioned runs (low quality optical vs low quality optical + IR vs low quality optical + IR + UV) but was negative if comparing all other previous experimental runs (~7 smaller runs with less epochs, images, etc.). My best guess about this is that either the extra information is “confusing” the generator somehow or outliers are distorting the correlation, according to W&B docs “*correlations are sensitive to outliers, which might turn a strong relationship to a moderate one, specially if the sample size of hyperparameters tried is small*”.
 
-## [Docker](docs/docker.md)
-We provide the pre-built Docker image and Dockerfile that can run this code repo. See [docker](docs/docker.md).
+Although a visual comparison of the results is hard and subjective given the high similarity of the images, there seems to be several repeated patterns that could point to some conclusions about using additional information from several wavelengths (red circle = incorrect, green circle = correct):
 
-## [Datasets](docs/datasets.md)
-Download pix2pix/CycleGAN datasets and create your own datasets.
+It seems to reinforce generation confidence when there are overlapping astronomical objects:
 
-## [Training/Test Tips](docs/tips.md)
-Best practice for training and testing your models.
+![imagen](https://user-images.githubusercontent.com/108660081/182451643-05a34365-7d3f-4211-b95b-29cff990a35f.png)
 
-## [Frequently Asked Questions](docs/qa.md)
-Before you post a new question, please first look at the above Q & A and existing GitHub issues.
+Better rendering of brightness and color of point-like objects:
+![imagen](https://user-images.githubusercontent.com/108660081/182451832-3ed2c0fa-c55b-487e-a716-c7e3e6f691f6.png)
 
-## Custom Model and Dataset
-If you plan to implement custom models and dataset for your new applications, we provide a dataset [template](data/template_dataset.py) and a model [template](models/template_model.py) as a starting point.
+Incorrect inclusion of extremely faint groups of small background point-like objects (possible confusion due to additional information):
+![imagen](https://user-images.githubusercontent.com/108660081/182452201-8546bab0-8351-49da-9f5b-dd1f0e68014d.png)
 
-## [Code structure](docs/overview.md)
-To help users better understand and use our code, we briefly overview the functionality and implementation of each package and each module.
+With regard to this last issue, many instances were detected where the additional information seemed to have actually helped “turn off” those faint background point-like objects in optical +IR+UV while being shown (incorrectly) if using only optical as source image.
 
-## Pull Request
-You are always welcome to contribute to this repository by sending a [pull request](https://help.github.com/articles/about-pull-requests/).
-Please run `flake8 --ignore E501 .` and `python ./scripts/test_before_push.py` before you commit the code. Please also update the code structure [overview](docs/overview.md) accordingly if you add or remove files.
+Further experimentation with more complex images and additional wavelengths is needed but, judging by the results, the model seems to be using the additional information successfully to constrain and better render the target image. Specially interesting is the fact that color is better translated when using information from additional wavelengths, this is in line with Plank’s black-body radiation, visual appearance and radiation spectral density (and temperature) are interrelated.
 
-## Citation
-If you use this code for your research, please cite our papers.
-```
+## Acknowledgments 
 @inproceedings{CycleGAN2017,
   title={Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks},
   author={Zhu, Jun-Yan and Park, Taesung and Isola, Phillip and Efros, Alexei A},
@@ -220,27 +103,13 @@ If you use this code for your research, please cite our papers.
   year={2017}
 }
 
-
 @inproceedings{isola2017image,
   title={Image-to-Image Translation with Conditional Adversarial Networks},
   author={Isola, Phillip and Zhu, Jun-Yan and Zhou, Tinghui and Efros, Alexei A},
   booktitle={Computer Vision and Pattern Recognition (CVPR), 2017 IEEE Conference on},
   year={2017}
 }
-```
 
-## Other Languages
-[Spanish](docs/README_es.md)
+This project has made use of "Aladin sky atlas" developed at CDS, Strasbourg Observatory, France 
+→ [2000A&AS..143...33B](http://cdsads.u-strasbg.fr/cgi-bin/nph-bib_query?2000A%26AS..143...33B&db_key=AST&nosetcookie=1) and [2014ASPC..485..277B](http://cdsads.u-strasbg.fr/cgi-bin/nph-bib_query?2014ASPC..485..277B&db_key=AST&nosetcookie=1).
 
-## Related Projects
-**[contrastive-unpaired-translation](https://github.com/taesungp/contrastive-unpaired-translation) (CUT)**<br>
-**[CycleGAN-Torch](https://github.com/junyanz/CycleGAN) |
-[pix2pix-Torch](https://github.com/phillipi/pix2pix) | [pix2pixHD](https://github.com/NVIDIA/pix2pixHD)|
-[BicycleGAN](https://github.com/junyanz/BicycleGAN) | [vid2vid](https://tcwang0509.github.io/vid2vid/) | [SPADE/GauGAN](https://github.com/NVlabs/SPADE)**<br>
-**[iGAN](https://github.com/junyanz/iGAN) | [GAN Dissection](https://github.com/CSAILVision/GANDissect) | [GAN Paint](http://ganpaint.io/)**
-
-## Cat Paper Collection
-If you love cats, and love reading cool graphics, vision, and learning papers, please check out the Cat Paper [Collection](https://github.com/junyanz/CatPapers).
-
-## Acknowledgments
-Our code is inspired by [pytorch-DCGAN](https://github.com/pytorch/examples/tree/master/dcgan).
