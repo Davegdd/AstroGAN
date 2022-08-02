@@ -1,4 +1,4 @@
-# Space image-to-image translation with Pix2Pix and Aladin Sky Atlas
+# Multiinput image-to-image translation with Pix2Pix and Aladin Sky Atlas
 
 This project uses the conditional GAN Pix2Pix in combination with the Aladin Sky Atlas software to generate images of a portion of the sky in a desired wavelength from images of the same portion of the sky in other wavelengths. 
 The code of the original Pix2Pix to input a dataset has been slightly modified in order to accept several input images, thus allowing the model to go not only from B to A but from B + C + D… to A. 
