@@ -32,7 +32,7 @@ For the model to correctly accept data points like the example above and process
 [...]
 import torch
 [...]
-        # split AB image into A and B (concatenated B+C+D)
+        # split AB image into A, B, C and D
         w, h = AB.size
         w4 = int(w / 4)
         A = AB.crop((0, 0, w4, h))
@@ -40,7 +40,7 @@ import torch
         C = AB.crop((w4*2, 0, w4*3, h))
         D = AB.crop((w4*3, 0, w, h))
 
-        # apply the same transform to both A and B
+        # apply the same transform to A, B, C and D and concatenate B as B+C+D
         transform_params = get_params(self.opt, A.size)
         A_transform = get_transform(self.opt, transform_params, grayscale=(self.input_nc == 1))
         B_transform = get_transform(self.opt, transform_params, grayscale=(self.output_nc == 1))
