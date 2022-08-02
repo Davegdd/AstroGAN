@@ -40,7 +40,7 @@ class AlignedDataset(BaseDataset):
         # read a image given a random integer index
         AB_path = self.AB_paths[index]
         AB = Image.open(AB_path).convert('RGB')
-        # split AB image into A and B
+        # split AB image into A, B, C and D
         w, h = AB.size
         w4 = int(w / 4)
         A = AB.crop((0, 0, w4, h))
@@ -48,7 +48,7 @@ class AlignedDataset(BaseDataset):
         C = AB.crop((w4*2, 0, w4*3, h))
         D = AB.crop((w4*3, 0, w, h))
 
-        # apply the same transform to both A and B
+        # apply the same transform to A, B, C and D and concatenate B as B+C+D
         transform_params = get_params(self.opt, A.size)
         A_transform = get_transform(self.opt, transform_params, grayscale=(self.input_nc == 1))
         B_transform = get_transform(self.opt, transform_params, grayscale=(self.output_nc == 1))
@@ -58,7 +58,7 @@ class AlignedDataset(BaseDataset):
         C = B_transform(C)
         D = B_transform(D)
         B = torch.cat((B, C, D))
-
+        
         return {'A': A, 'B': B, 'A_paths': AB_path, 'B_paths': AB_path}
 
     def __len__(self):
