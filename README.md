@@ -10,23 +10,36 @@ Different sky surveys have yielded data about portions of the sky in different w
 From a theoretical point of view, the physical law most relevant to our use case is Planck’s law. This law describes the spectral density of electromagnetic radiation emitted by a black body in thermal equilibrium at a given temperature T. A black-body is an idealized object which absorbs and emits all radiation frequencies. Planck radiation has a maximum intensity at a wavelength that depends on the temperature of the body ([Wikipedia](https://en.wikipedia.org/wiki/Planck%27s_law)).
 
 
-  <img align="center" src="https://user-images.githubusercontent.com/108660081/182445316-5c914dd2-76a6-4630-b442-be5027ea1635.png" width="400"/>  
-  <img align="center" src="https://user-images.githubusercontent.com/108660081/182445881-8093107d-358f-4b29-8723-749766a62127.png" width="400"/>
-                  <sub>Family of curves for different temperatures (left) and the Sun approximated as a black-body (right)</sub>
+<img align="center" src="https://user-images.githubusercontent.com/108660081/182568257-ac39976b-cbee-49af-9d41-27b38f2f500c.png" width="800"/>   
+<sub>Family of curves for different temperatures (left) and the Sun approximated as a black-body (right)</sub>
 
 In other words, Planck’s law shows that it may be possible to use complementary wavelengths (astronomical observations) to reconstruct a missing one.
 
-## Dataset creation
+## Dataset creation and training
 Each data point or element in the dataset should look like this:
 
 ![imagen](https://user-images.githubusercontent.com/108660081/182447267-f2db0b77-10cc-44e3-ae1e-a7490eb39d4a.png)
 
 A single image made up of several (4 in this case) horizontally concatenated images of the same object from different observations/wavelengths (SDSS9 (high-res optical), GALEX (UV), 2MASS (IR) and DSS2 (low-res optical), respectively in the previous example).
 
-To create a dataset for training and/or a data point for inference the desired images have to be extracted from Aladin, a sky atlas software. The script aladin_data.py contains a basic example to automatically extract the 7840 astronomical objects in the New General Catalogue (NGC) in four different wavelengths from Aladin and concatenate them into a dataset. It is possible to get any other object or portion of the sky by modifying the script. The name of astronomical objects as well as specific coordinates can be used as input to extract images from Aladin.
+A link to this complete dataset together with the 3 pretrained models used in the section *Some results and comments* further below can be found in the folder datasets.
+
+To create a different dataset for training and/or a data point for inference the desired images have to be extracted from Aladin, a sky atlas software. The script aladin_dataset.py in the datasets folder contains a basic example to automatically extract the 7840 astronomical objects in the New General Catalogue (NGC) in four different wavelengths from Aladin and concatenate them into a dataset. It is possible to get any other astronomical object or portion of the sky by modifying the script. The name of astronomical objects as well as specific coordinates can be used as input to extract images from Aladin. To know more about how to use Aladin, please check the official [documentation](https://aladin.cds.unistra.fr/AladinDesktop/).
+
+For training:
+
+```
+python train.py --dataroot /pathtodataset/ --name yourmodelname --model pix2pix --direction BtoA --use_wandb --input_nc 9
+```
+For testing:
+
+```
+python test.py --dataroot /pathtodataset/ --direction BtoA --model pix2pix --name pretrainedmodelname --input_nc 9
+```
+The two most important things here are to select direction BtoA and input_nc 9. For testing, the pretrained model file (.pth format) should be correctly named and placed in checkpoints/pretrainedmodelname/latest_net_G.pth. For further details on training/testing please check the original Pix2Pix repository.
 
 ## Pix2Pix code modification
-For the model to correctly accept data points like the example above and process them into several input images and one output image, the last part of the code aligned_dataset.py was modified as follows. This code assumes that 4 images of 3 channels each are fed, crops them, transforms them and concatenates the inputs as tensors (3 inputs and 1 output, B+C+D =>A) (in principle it should be possible to allow an arbitrary number of input images with a more efficient modification):
+For the model to correctly accept data points like the example above and process them into several input images and one output image, the last part of the code aligned_dataset.py has been modified as follows. This code assumes that 4 images of 3 channels each are fed, crops them, transforms them and concatenates the inputs as tensors (3 inputs and 1 target, B+C+D =>A) (in principle it should be possible to allow an arbitrary number of input images with a more efficient modification):
 
 ```
 [...]
@@ -55,7 +68,7 @@ import torch
 
 ```
 
-Additionally, the current original Pix2Pix code does not support visualization of images with a number of channels different from 1 or 3. To avoid an error, the function called tensor2im in util.py has to be modified by adding the following:
+Additionally, the current original Pix2Pix code does not support visualization of images with a number of channels different from 1 or 3. To avoid an error, the function called tensor2im in util.py has been modified by adding the following:
 
 ```
 [...]
@@ -69,15 +82,19 @@ Additionally, the current original Pix2Pix code does not support visualization o
 This will just resplit the input images that were concatenated to feed the network and return one of them for visualization as real B (origin) for reference.
 
 ## Some results and comments
-A Pix2Pix model was trained on a dataset of 3019 images of objects of the NGC to go from low quality optical (DSS2) to better quality optical (SDSS9), using (i) only low quality optical, (ii) low quality optical + IR and (iii) low quality optical + IR + UV. The training was stopped at around 90 epochs given a non-improving divergence in the adversarial loss and the model at epoch 65 (before divergence started) used for testing. The results were compared in the W&B platform using the generator loss as metric and by visual inspection.
+A Pix2Pix model was trained on a dataset of 3019 images of objects of the NGC to go from low quality optical (DSS2) to better quality optical (SDSS9), using (i) only low quality optical, (ii) low quality optical + IR and (iii) low quality optical + IR + UV. The training was stopped at around 90 epochs given a non-improving divergence in the adversarial loss, and the model at epoch 65 (before divergence started) used for testing. The results were compared in the W&B platform using the generator loss as metric and by visual inspection.
 
-The loss function of the generator in Pix2Pix is made up of two terms: the adversarial loss and the L1 loss:
+The loss function of the generator in Pix2Pix is made up of two terms, the adversarial loss and the L1 loss:
 
 ![imagen](https://user-images.githubusercontent.com/108660081/182449312-2547c60c-4e81-4dc8-8e80-8a17a527c702.png)
 
 According to Jason Brownlee from [Machine Learning Mastery](https://machinelearningmastery.com/a-gentle-introduction-to-pix2pix-generative-adversarial-network/) “*The adversarial loss influences whether the generator model can output images that are plausible in the target domain, whereas the L1 loss regularizes the generator model to output images that are a plausible translation of the source image*”. 
 
 The parameter importance tool from W&B shows that there is a relevant negative correlation between the adversarial loss and the parameter input_nc (number of input channels, i.e., number of input images), that is, the higher the number of input images the lower the loss, as expected. Regarding the L1 loss, the correlation varied during training between positive and negative while comparing only the three abovementioned runs (low quality optical vs low quality optical + IR vs low quality optical + IR + UV) but was negative if comparing all other previous experimental runs (~7 smaller runs with less epochs, images, etc.). My best guess about this is that either the extra information is “confusing” the generator somehow or outliers are distorting the correlation, according to W&B docs “*correlations are sensitive to outliers, which might turn a strong relationship to a moderate one, specially if the sample size of hyperparameters tried is small*”.
+
+![imagen](https://user-images.githubusercontent.com/108660081/182573907-ebc1db09-04f8-40a3-9584-baa184d8f0e8.png)
+![imagen](https://user-images.githubusercontent.com/108660081/182574020-0c3a1dd7-32c8-4168-89a8-f05cd2b32f6e.png)
+
 
 Although a visual comparison of the results is hard and subjective given the high similarity of the images, there seems to be several repeated patterns that could point to some conclusions about using additional information from several wavelengths (red circle = incorrect, green circle = correct):
 
