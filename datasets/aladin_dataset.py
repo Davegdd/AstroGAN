@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Place Aladin.jar file in working directory 
 as well as the views.eps.aj file created in Aladin 
@@ -9,7 +8,6 @@ and then crop_and_concat() to concatenate, crop the watermark
 and save as one file made up of four images.
 """
 
-#!/usr/bin/env python
 import subprocess
 import os
 import numpy as np
