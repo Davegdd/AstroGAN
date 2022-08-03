@@ -1,7 +1,8 @@
 """
 Place Aladin.jar file in working directory 
-as well as the views.eps.aj file created in Aladin 
-that contains the desired astronomical observation planes.
+as well as the .eps.aj file created in Aladin 
+that contains the desired astronomical observation planes
+(you can find Aladin.jar and the example views.eps.aj in the datasets folder).
 
 Call img_extraction() first to extract and save the images separately 
 and then crop_and_concat() to concatenate, crop the watermark 
